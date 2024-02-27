@@ -52,7 +52,6 @@ namespace GTA_5_RP
                 {
                     var Execute = await Client.ExecutePostAsync(Request);
 
-
                     if (string.IsNullOrEmpty(Execute.Content))
                     {
                         if (Execute.StatusCode == 0 || Execute.StatusCode == HttpStatusCode.OK)
