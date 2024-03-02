@@ -7,6 +7,15 @@ namespace GTA_5_RP
 {
     public class Telegram
     {
+        private readonly string Token;
+        private readonly int ChatID;
+
+        public Telegram(string Token, int ChatID)
+        {
+            this.Token = Token;
+            this.ChatID = ChatID;
+        }
+
         #region Send Message
 
         public class IMessageResponse
@@ -28,7 +37,7 @@ namespace GTA_5_RP
         }
 
 
-        public static async Task<int?> SendMessage(string Text, bool Notification = false)
+        public async Task<int?> SendMessage(string Text, bool Notification = false)
         {
             var Client = new RestClient(
                 new RestClientOptions()
@@ -37,9 +46,9 @@ namespace GTA_5_RP
                     MaxTimeout = 300000
                 });
 
-            var Request = new RestRequest($"https://api.telegram.org/bot1423302927:AAFeYSZ48tQjLSQPPirE5nx5pHw_GZoNNOw/sendMessage");
+            var Request = new RestRequest($"https://api.telegram.org/bot{Token}/sendMessage");
 
-            Request.AddParameter("chat_id", 202924271);
+            Request.AddParameter("chat_id", ChatID);
             Request.AddParameter("text", Text);
             Request.AddParameter("parse_mode", "HTML");
             Request.AddParameter("disable_web_page_preview", true);
@@ -51,6 +60,8 @@ namespace GTA_5_RP
                 try
                 {
                     var Execute = await Client.ExecutePostAsync(Request);
+
+                    Logger.LogTrace(Execute.Content);
 
                     if (string.IsNullOrEmpty(Execute.Content))
                     {

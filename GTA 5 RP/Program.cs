@@ -23,6 +23,7 @@ namespace GTA_5_RP
         private static string UserFile = "";
         private static string StorageFile = "";
 
+        private static Telegram? Telegram;
         private static IStorage? Storage;
 
         #region VIP
@@ -336,7 +337,10 @@ namespace GTA_5_RP
 
                                     if (Message > EMessage.DISABLED)
                                     {
-                                        _ = Telegram.SendMessage($"\"{Name}\" освободился!", Message == EMessage.MUTE);
+                                        if (Telegram is not null)
+                                        {
+                                            _ = Telegram.SendMessage($"\"{Name}\" освободился!", Message == EMessage.MUTE);
+                                        }
                                     }
                                 }
                                 catch (ThreadInterruptedException) { }
@@ -800,108 +804,116 @@ namespace GTA_5_RP
 
             _ = new Mutex(true, string.Join("-", List), out Unique);
 
-            if (A.Length == 0 && Unique)
+            switch (A.Length)
             {
-                string[] Directories = System.IO.Directory.GetDirectories(ConfigDirectory);
+                case 2 when Unique:
 
-                if (Directories.Length == 0) return;
+                    string[] Directories = System.IO.Directory.GetDirectories(ConfigDirectory);
 
-                foreach (var T in Directories)
-                {
-                    var Process = new Process
+                    if (Directories.Length == 0) return;
+
+                    foreach (var T in Directories)
                     {
-                        StartInfo = new ProcessStartInfo
+                        var Process = new Process
                         {
-                            FileName = Environment.ProcessPath,
-                            UseShellExecute = true,
-                            Arguments = Path.GetFileName(T)
-                        }
-                    };
+                            StartInfo = new ProcessStartInfo
+                            {
+                                FileName = Environment.ProcessPath,
+                                UseShellExecute = true,
+                                Arguments = Path.GetFileName(T) + " " + string.Join(" ", A)
+                            }
+                        };
 
-                    Process.Start();
-                }
+                        Process.Start();
+                    }
 
-                Environment.Exit(0);
-            }
-            else
-            {
-                Directory = Path.Combine(ConfigDirectory, A[0]);
+                    Environment.Exit(0);
 
-                if (System.IO.Directory.Exists(Directory) && int.TryParse(Path.GetFileName(Directory), out int Index))
-                {
-                    UserFile = Path.Combine(Directory, "!.txt");
-                    StorageFile = Path.Combine(Directory, "!.json");
+                    break;
 
-                    #region User
+                case 3:
 
-                    if (!File.Exists(UserFile)) File.Create(UserFile);
+                    Directory = Path.Combine(ConfigDirectory, A[0]);
 
-                    string[] T_User = File.ReadAllLines(UserFile);
-
-                    if (T_User.Length == 0) return;
-
-                    foreach (string Token in T_User)
+                    if (System.IO.Directory.Exists(Directory) && int.TryParse(Path.GetFileName(Directory), out int Index))
                     {
-                        if (Regex.IsMatch(Token, @"^([a-zA-Z0-9_-]{24}\.[a-zA-Z0-9_-]{6}\.[a-zA-Z0-9_-]{38})$"))
+                        UserFile = Path.Combine(Directory, "!.txt");
+                        StorageFile = Path.Combine(Directory, "!.json");
+
+                        Telegram = new Telegram(A[1], int.Parse(A[2]));
+
+                        #region User
+
+                        if (!File.Exists(UserFile)) File.Create(UserFile);
+
+                        string[] T_User = File.ReadAllLines(UserFile);
+
+                        if (T_User.Length == 0) return;
+
+                        foreach (string Token in T_User)
                         {
-                            UserList.Add(new IUser(Token));
+                            if (Regex.IsMatch(Token, @"^([a-zA-Z0-9_-]{24}\.[a-zA-Z0-9_-]{6}\.[a-zA-Z0-9_-]{38})$"))
+                            {
+                                UserList.Add(new IUser(Token));
+                            }
                         }
+
+                        if (UserList.Count == 0) return;
+
+                        #endregion
+
+                        #region Storage
+
+                        if (!File.Exists(StorageFile)) File.WriteAllText(StorageFile, JsonConvert.SerializeObject(new IStorage(), Formatting.Indented));
+
+                        string T_Storage = File.ReadAllText(StorageFile);
+
+                        if (string.IsNullOrEmpty(T_Storage)) return;
+
+                        Storage = JsonConvert.DeserializeObject<IStorage>(T_Storage);
+
+                        if (Storage == null) return;
+
+                        #endregion
+
+                        Destruction(Debug());
+
+                        int X = 100;
+                        int Y = 100;
+
+                        if (Index > 1)
+                        {
+                            X = Index * 180;
+                        }
+
+                        SetWindowPos(GetConsoleWindow(), IntPtr.Zero, X, Y, 0, 0, SWP_NOSIZE);
+
+                        using (Bitmap Bitmap = new(32, 32))
+                        {
+                            var Icon = Properties.Resources.Icon;
+
+                            using Graphics Graphics = System.Drawing.Graphics.FromImage(Bitmap);
+
+                            Graphics.DrawIcon(Icon, 0, 0);
+                            Graphics.DrawString(
+                                Index.ToString(),
+                                new Font("Calibri", 12, FontStyle.Regular),
+                                Brushes.White,
+                                new Rectangle(0, 0, Icon.Width, Icon.Height),
+                                new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
+
+                            IntPtr Hicon = Bitmap.GetHicon();
+
+                            var Current = Process.GetCurrentProcess();
+
+                            SendMessage(Current.MainWindowHandle, WM_SETICON, ICON_SMALL, Hicon);
+                            SendMessage(Current.MainWindowHandle, WM_SETICON, ICON_BIG, Hicon);
+                        }
+
+                        Init();
                     }
 
-                    if (UserList.Count == 0) return;
-
-                    #endregion
-
-                    #region Storage
-
-                    if (!File.Exists(StorageFile)) File.WriteAllText(StorageFile, JsonConvert.SerializeObject(new IStorage(), Formatting.Indented));
-
-                    string T_Storage = File.ReadAllText(StorageFile);
-
-                    if (string.IsNullOrEmpty(T_Storage)) return;
-
-                    Storage = JsonConvert.DeserializeObject<IStorage>(T_Storage);
-
-                    if (Storage == null) return;
-
-                    #endregion
-
-                    Destruction(Debug());
-
-                    int X = 100;
-                    int Y = 100;
-
-                    if (Index > 1)
-                    {
-                        X = Index * 180;
-                    }
-
-                    SetWindowPos(GetConsoleWindow(), IntPtr.Zero, X, Y, 0, 0, SWP_NOSIZE);
-
-                    using (Bitmap Bitmap = new(32, 32))
-                    {
-                        var Icon = Properties.Resources.Icon;
-
-                        using Graphics Graphics = System.Drawing.Graphics.FromImage(Bitmap);
-
-                        Graphics.DrawIcon(Icon, 0, 0);
-                        Graphics.DrawString(
-                            Index.ToString(),
-                            new Font("Calibri", 12, FontStyle.Regular),
-                            Brushes.White,
-                            new Rectangle(0, 0, Icon.Width, Icon.Height),
-                            new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
-
-                        IntPtr Hicon = Bitmap.GetHicon();
-
-                        var Current = Process.GetCurrentProcess();
-
-                        SendMessage(Current.MainWindowHandle, WM_SETICON, ICON_SMALL, Hicon);
-                        SendMessage(Current.MainWindowHandle, WM_SETICON, ICON_BIG, Hicon);
-                    }
-
-                    Init();
-                }
+                    break;
             }
 
             Console.ReadLine();
@@ -1893,7 +1905,10 @@ namespace GTA_5_RP
                                             }
                                             finally
                                             {
-                                                await Telegram.SendMessage(TEXT, Message == EMessage.MUTE);
+                                                if (Telegram is not null)
+                                                {
+                                                    await Telegram.SendMessage(TEXT, Message == EMessage.MUTE);
+                                                }
                                             }
                                         }
                                         else
@@ -1906,7 +1921,10 @@ namespace GTA_5_RP
                                             {
                                                 T.Update(X.LastMessageID);
 
-                                                await Telegram.SendMessage($"[{User.Name}] Вы получили сообщение!", Message == EMessage.MUTE);
+                                                if (Telegram is not null)
+                                                {
+                                                    await Telegram.SendMessage($"[{User.Name}] Вы получили сообщение!", Message == EMessage.MUTE);
+                                                }
                                             }
                                         }
                                     }
@@ -2186,7 +2204,10 @@ namespace GTA_5_RP
                                     {
                                         string[] Array = X.Key.Split(" - ");
 
-                                        await Telegram.SendMessage($"\"{(Regex.IsMatch(Array[0], "Аккаунт #[0-9]+") ? Array.First() + " - " : "")}{Array.Last()}\" доступно!", Message == EMessage.MUTE);
+                                        if (Telegram is not null)
+                                        {
+                                            await Telegram.SendMessage($"\"{(Regex.IsMatch(Array[0], "Аккаунт #[0-9]+") ? Array.First() + " - " : "")}{Array.Last()}\" доступно!", Message == EMessage.MUTE);
+                                        }
                                     }
                                 }
                                 catch (OperationCanceledException) { }
