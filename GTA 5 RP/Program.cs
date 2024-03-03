@@ -18,10 +18,13 @@ namespace GTA_5_RP
 #pragma warning restore CA2211 // Non-constant fields should not be visible
 
         private static readonly string ConfigDirectory = "config";
+        private static readonly string ConfigFile = Path.Combine(ConfigDirectory, "config.json");
 
         private static string Directory = "";
         private static string UserFile = "";
         private static string StorageFile = "";
+
+        private static IConfig? Config;
 
         private static Telegram? Telegram;
         private static IStorage? Storage;
@@ -804,116 +807,122 @@ namespace GTA_5_RP
 
             _ = new Mutex(true, string.Join("-", List), out Unique);
 
-            switch (A.Length)
+            if (A.Length == 0 && Unique) 
             {
-                case 2 when Unique:
+                string[] Directories = System.IO.Directory.GetDirectories(ConfigDirectory);
 
-                    string[] Directories = System.IO.Directory.GetDirectories(ConfigDirectory);
+                if (Directories.Length == 0) return;
 
-                    if (Directories.Length == 0) return;
-
-                    foreach (var T in Directories)
+                foreach (var T in Directories)
+                {
+                    var Process = new Process
                     {
-                        var Process = new Process
+                        StartInfo = new ProcessStartInfo
                         {
-                            StartInfo = new ProcessStartInfo
-                            {
-                                FileName = Environment.ProcessPath,
-                                UseShellExecute = true,
-                                Arguments = Path.GetFileName(T) + " " + string.Join(" ", A)
-                            }
-                        };
+                            FileName = Environment.ProcessPath,
+                            UseShellExecute = true,
+                            Arguments = Path.GetFileName(T)
+                        }
+                    };
 
-                        Process.Start();
+                    Process.Start();
+                }
+
+                Environment.Exit(0);
+            }
+            else
+            {
+                Directory = Path.Combine(ConfigDirectory, A[0]);
+
+                if (System.IO.Directory.Exists(Directory) && int.TryParse(Path.GetFileName(Directory), out int Index))
+                {
+                    UserFile = Path.Combine(Directory, "!.txt");
+                    StorageFile = Path.Combine(Directory, "!.json");
+
+                    (string? ErrorMessage, Config) = IConfig.Load(ConfigDirectory, ConfigFile);
+
+                    if (Config == null)
+                    {
+                        Console.WriteLine(ErrorMessage);
+
+                        return;
                     }
 
-                    Environment.Exit(0);
-
-                    break;
-
-                case 3:
-
-                    Directory = Path.Combine(ConfigDirectory, A[0]);
-
-                    if (System.IO.Directory.Exists(Directory) && int.TryParse(Path.GetFileName(Directory), out int Index))
+                    if (Config.ShouldSerializeToken() && Config.ShouldSerializeChatID())
                     {
-                        UserFile = Path.Combine(Directory, "!.txt");
-                        StorageFile = Path.Combine(Directory, "!.json");
-
-                        Telegram = new Telegram(A[1], int.Parse(A[2]));
-
-                        #region User
-
-                        if (!File.Exists(UserFile)) File.Create(UserFile);
-
-                        string[] T_User = File.ReadAllLines(UserFile);
-
-                        if (T_User.Length == 0) return;
-
-                        foreach (string Token in T_User)
-                        {
-                            if (Regex.IsMatch(Token, @"^([a-zA-Z0-9_-]{24}\.[a-zA-Z0-9_-]{6}\.[a-zA-Z0-9_-]{38})$"))
-                            {
-                                UserList.Add(new IUser(Token));
-                            }
-                        }
-
-                        if (UserList.Count == 0) return;
-
-                        #endregion
-
-                        #region Storage
-
-                        if (!File.Exists(StorageFile)) File.WriteAllText(StorageFile, JsonConvert.SerializeObject(new IStorage(), Formatting.Indented));
-
-                        string T_Storage = File.ReadAllText(StorageFile);
-
-                        if (string.IsNullOrEmpty(T_Storage)) return;
-
-                        Storage = JsonConvert.DeserializeObject<IStorage>(T_Storage);
-
-                        if (Storage == null) return;
-
-                        #endregion
-
-                        Destruction(Debug());
-
-                        int X = 100;
-                        int Y = 100;
-
-                        if (Index > 1)
-                        {
-                            X = Index * 180;
-                        }
-
-                        SetWindowPos(GetConsoleWindow(), IntPtr.Zero, X, Y, 0, 0, SWP_NOSIZE);
-
-                        using (Bitmap Bitmap = new(32, 32))
-                        {
-                            var Icon = Properties.Resources.Icon;
-
-                            using Graphics Graphics = System.Drawing.Graphics.FromImage(Bitmap);
-
-                            Graphics.DrawIcon(Icon, 0, 0);
-                            Graphics.DrawString(
-                                Index.ToString(),
-                                new Font("Calibri", 12, FontStyle.Regular),
-                                Brushes.White,
-                                new Rectangle(0, 0, Icon.Width, Icon.Height),
-                                new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
-
-                            IntPtr Hicon = Bitmap.GetHicon();
-
-                            var Current = Process.GetCurrentProcess();
-
-                            SendMessage(Current.MainWindowHandle, WM_SETICON, ICON_SMALL, Hicon);
-                            SendMessage(Current.MainWindowHandle, WM_SETICON, ICON_BIG, Hicon);
-                        }
-
-                        Init();
+                        Telegram = new Telegram(Config.Token!, Config.ChatID);
                     }
 
-                    break;
+                    #region User
+
+                    if (!File.Exists(UserFile)) File.Create(UserFile);
+
+                    string[] T_User = File.ReadAllLines(UserFile);
+
+                    if (T_User.Length == 0) return;
+
+                    foreach (string Token in T_User)
+                    {
+                        if (Regex.IsMatch(Token, @"^([a-zA-Z0-9_-]{24}\.[a-zA-Z0-9_-]{6}\.[a-zA-Z0-9_-]{38})$"))
+                        {
+                            UserList.Add(new IUser(Token));
+                        }
+                    }
+
+                    if (UserList.Count == 0) return;
+
+                    #endregion
+
+                    #region Storage
+
+                    if (!File.Exists(StorageFile)) File.WriteAllText(StorageFile, JsonConvert.SerializeObject(new IStorage(), Formatting.Indented));
+
+                    string T_Storage = File.ReadAllText(StorageFile);
+
+                    if (string.IsNullOrEmpty(T_Storage)) return;
+
+                    Storage = JsonConvert.DeserializeObject<IStorage>(T_Storage);
+
+                    if (Storage == null) return;
+
+                    #endregion
+
+                    Destruction(Debug());
+
+                    int X = 100;
+                    int Y = 100;
+
+                    if (Index > 1)
+                    {
+                        X = Index * 180;
+                    }
+
+                    SetWindowPos(GetConsoleWindow(), IntPtr.Zero, X, Y, 0, 0, SWP_NOSIZE);
+
+                    using (Bitmap Bitmap = new(32, 32))
+                    {
+                        var Icon = Properties.Resources.Icon;
+
+                        using Graphics Graphics = System.Drawing.Graphics.FromImage(Bitmap);
+
+                        Graphics.DrawIcon(Icon, 0, 0);
+                        Graphics.DrawString(
+                            Index.ToString(),
+                            new Font("Calibri", 12, FontStyle.Regular),
+                            Brushes.White,
+                            new Rectangle(0, 0, Icon.Width, Icon.Height),
+                            new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
+
+                        IntPtr Hicon = Bitmap.GetHicon();
+
+                        var Current = Process.GetCurrentProcess();
+
+                        SendMessage(Current.MainWindowHandle, WM_SETICON, ICON_SMALL, Hicon);
+                        SendMessage(Current.MainWindowHandle, WM_SETICON, ICON_BIG, Hicon);
+                    }
+
+                    Init();
+                }
             }
 
             Console.ReadLine();
